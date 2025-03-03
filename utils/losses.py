@@ -26,6 +26,27 @@ def manual_cross_entropy(labels, logits, weight):
   ce = - weight * jnp.sum(labels * jax.nn.log_softmax(logits), axis=-1)
   return jnp.mean(ce)
 
+def straightness_quotient(pred, target,c):
+    """
+    Args:
+      pred (jnp.array): the prediction from first view.
+      target (jnp.array): the projection from first view.
+      c: reguliser constant eg-0.001
+
+    Returns:
+      A single scalar straightness quotient to be added to net loss.
+    """
+    mag_pred = jnp.linalg.norm(pred)
+    mag_target = jnp.linalg.norm(target)
+    dot_product = jnp.dot(pred,target)
+    if mag_pred!=0 and mag_target!=0:
+      normalised_dot_product = dot_product/(mag_pred*mag_target)
+      angle = jnp.arccos(normalised_dot_product)/jnp.pi 
+      return c*angle
+    elif mag_pred==0 and mag_target==0:
+      return 0
+    else:
+      return c
 
 def byol_nce_detcon(pred1, pred2, target1, target2,
                     pind1, pind2, tind1, tind2,
@@ -148,6 +169,6 @@ def byol_nce_detcon(pred1, pred2, target1, target2,
 
   loss_a = manual_cross_entropy(labels_0, logits_abaa, weights_0)
   loss_b = manual_cross_entropy(labels_1, logits_babb, weights_1)
-  loss = loss_a + loss_b
+  loss = loss_a + loss_b + straightness_quotient(logits_abaa,logits_babb,0.001)
 
   return loss
